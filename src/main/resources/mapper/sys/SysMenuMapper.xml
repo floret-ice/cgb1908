@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cy.pj.sys.dao.SysMenuDao">
+  <cache
+   eviction="LRU"
+   flushInterval="30000"
+   size="512"
+   readOnly="true"/><!-- 使用mybatis中二级缓存 -->
+   
+   <select id="findChildMenus" 
+           resultType="com.cy.pj.sys.vo.SysUserMenuVo">
+       select id,name,url
+       from sys_menus
+       where parentId=#{id} and type=1
+   </select>
+   
+   <resultMap id="sysUserMenuVo" 
+              type="com.cy.pj.sys.vo.SysUserMenuVo">
+       <id property="id" column="id"/>
+       <collection column="id" 
+                   property="childMenus" 
+                   select="findChildMenus">       
+       </collection>
+   </resultMap>
+   
+   <select id="findUserMenus" 
+           resultMap="sysUserMenuVo">
+      select id,name,url
+      from sys_menus
+      where parentId is null
+   </select>
+   
+   <!-- 基于菜单id查询对应的权限标识 -->
+   <select id="findPermissions"
+           resultType="string">
+       select permission <!-- sys:user:update -->
+       from sys_menus
+       <where>
+       <foreach collection="menuIds"
+                separator="or"
+                item="menuId">
+            id=#{menuId}
+       </foreach>
+       </where> 
+   </select>
+   
+  <select id="findObjects" resultType="map">
+     <!-- 方案1: 多表关联查询(左外连接) 
+     select c.*,p.name parentName
+     from sys_menus c left outer join sys_menus p
+     on c.parentId=p.id
+     -->
+      
+     <!-- 方案2: 嵌套查询 -->
+     select c.*,(
+                 select p.name from sys_menus p
+                 where c.parentId=p.id
+                 ) parentName
+     from sys_menus c                 
+  </select>
+  <!-- 基于id统计子菜单数量的元素 -->
+  <select id="getChildCount" 
+          parameterType="int" 
+          resultType="int">
+      select count(*)
+      from sys_menus
+      where parentId=#{id}
+  </select>
+  <!-- 基于带单id删除菜单自身记录信息 -->
+  <delete id="deleteObject">
+     delete from sys_menus
+     where id =#{id}
+     
+  </delete>
+  <!-- 查询上级菜单信息 -->
+  <select id="findZtreeMenuNodes" 
+          resultType="com.cy.pj.common.vo.Node">
+      select id,name,parentId
+      from sys_menus
+  </select>
+  <!-- 用于写入菜单信息(将数据持久化到数据库) -->
+  <insert id="insertObject"
+	parameterType="com.cy.pj.sys.entity.SysMenu">
+	insert into sys_menus
+	(name,url,type,sort,note,parentId,permission,
+	createdTime,modifiedTime,createdUser,modifiedUser)
+	values
+	(#{name},#{url},#{type},#{sort},#{note},#{parentId},
+	#{permission},now(),now(),#{createdUser},#{modifiedUser})
+  </insert>
+  <!-- 用于更新菜单信息 -->
+  <update id="updateObject"
+            parameterType="com.cy.pj.sys.entity.SysMenu">
+         update sys_menus
+         set
+           name=#{name},
+           type=#{type},
+           sort=#{sort},
+           url=#{url},
+           parentId=#{parentId},
+           permission=#{permission},
+           modifiedUser=#{modifiedUser},
+           modifiedTime=now()
+        where id=#{id}
+    </update>
+
+  
+</mapper>  
